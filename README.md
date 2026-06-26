@@ -33,31 +33,6 @@ no land borders skip the "name the neighbours" round, and places with no major
 river skip the river round, and the largest-district round only appears for states with
 enough districts to make it interesting — so the round count adapts (10–13).
 
-## Play locally
-
-Open `index.html` in any browser, or serve the folder:
-
-```bash
-python3 -m http.server 8000   # then visit http://localhost:8000
-```
-
-## Deploy to GitHub Pages
-
-1. Create a new repository on GitHub (e.g. `statele`).
-2. Add `index.html` to the root of the repo and push:
-   ```bash
-   git init
-   git add index.html
-   git commit -m "Add Statele game"
-   git branch -M main
-   git remote add origin https://github.com/<your-username>/statele.git
-   git push -u origin main
-   ```
-3. In the repo, go to **Settings → Pages**.
-4. Under **Build and deployment → Source**, choose **Deploy from a branch**.
-5. Set the branch to **main** and the folder to **/ (root)**, then **Save**.
-6. Wait a minute, then visit `https://<your-username>.github.io/statele/`.
-
 ## Landmark photos
 
 The three landmark rounds use **real photos**, loaded from Wikipedia at play-time
