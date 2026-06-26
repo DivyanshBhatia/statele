@@ -216,7 +216,8 @@ header{text-align:center;padding-top:2px}
   background:none;border:0;border-radius:999px;padding:6px 13px;cursor:pointer;text-transform:uppercase;transition:.15s}
 .seg-btn.active{color:#241500;background:var(--marigold)}
 .seg-btn#segPractice.active{color:#04201c;background:var(--peacock)}
-.giveup{text-align:center}
+.giveup{text-align:center;display:flex;align-items:center;justify-content:center;gap:18px;flex-wrap:wrap}
+.giveup .navlink{color:var(--peacock)}
 .giveup button{background:none;border:0;color:var(--muted2);font-size:12px;cursor:pointer;
   font-family:var(--body);text-decoration:underline;text-underline-offset:3px}
 .giveup button:hover{color:var(--muted)}
@@ -274,7 +275,7 @@ footer{text-align:center;color:var(--muted2);font-size:11px;line-height:1.7;marg
 
   <div id="stage"></div>
 
-  <div class="giveup" id="giveupBar"><button id="giveupBtn">Give up &amp; see results</button></div>
+  <div class="giveup" id="giveupBar"><button id="prevBtn" class="navlink" style="display:none">← Previous round</button><button id="giveupBtn">Give up &amp; see results</button></div>
 
   <details class="howto">
     <summary>How to play <span class="chev">›</span></summary>
@@ -421,8 +422,10 @@ function finishRound(key,success){
 }
 
 /* ===================== round dispatcher ===================== */
+function goPrevRound(){if(G.idx>0&&!G.gaveUp){G.idx--;persist();renderRound();}}
 function renderRound(){
   renderBadges();
+  const pb=$('#prevBtn');if(pb)pb.style.display=(G.idx>0&&!G.gaveUp)?'':'none';
   const r=G.rounds[G.idx];const st=G.target;
   const fns={shape:roundShape,capital:roundCapital,cappin:roundCapPin,
     locate:roundLocate,nbrcount:roundNbrCount,nbrname:roundNbrName,
@@ -489,6 +492,7 @@ const STATE_NAMES=STATES.map(s=>s.name);
 const LANGS_ALL=(()=>{const set=new Set();
   STATES.forEach(s=>s.langs.forEach(grp=>grp.forEach(l=>set.add(capWords(l)))));
   return [...set].sort();})();
+const CAPITALS_ALL=[...new Set(STATES.map(s=>s.capital))].sort();
 
 /* The "Spot the landmark" round loads real photos from Wikipedia at play-time.
    To pin a specific image instead, add an explicit URL here (name -> url); an
@@ -669,8 +673,9 @@ function typeRound(opts){
 /* ---------- ROUND: CAPITAL (type) ---------- */
 function roundCapital(st){
   typeRound({key:'capital',eyebrow:roundTag(),title:`What is the <b>capital</b> of ${st.name}?`,
-    sub:'Type the capital city · 3 tries',placeholder:'Capital city…',attempts:3,
-    accept:[st.capital],reveal:s=>s?`Correct — the capital is <b>${st.capital}</b>.`:`The capital of ${st.name} is <b>${st.capital}</b>.`});
+    sub:'Start typing — pick the capital from the list · 3 tries',placeholder:'Capital city…',attempts:3,
+    accept:[st.capital],autocomplete:CAPITALS_ALL,pickSubmit:false,
+    reveal:s=>s?`Correct — the capital is <b>${st.capital}</b>.`:`The capital of ${st.name} is <b>${st.capital}</b>.`});
 }
 
 /* ---------- generic PIN round ---------- */
@@ -731,7 +736,7 @@ function roundNbrName(st){
     title:`Name the states &amp; UTs bordering <b>${st.name}</b>`,
     sub:`There ${st.neighbours.length===1?'is 1':'are '+st.neighbours.length}. Type each — pick from the list.`,
     placeholder:'A neighbour…',multi:st.neighbours.length,targets:st.neighbours.slice(),
-    resolver:resolveState,autocomplete:STATE_NAMES,pickSubmit:true,
+    resolver:resolveState,autocomplete:STATE_NAMES,pickSubmit:false,
     reveal:s=>`Neighbours of ${st.name}: <b>${st.neighbours.join(', ')}</b>.`});
 }
 
@@ -800,34 +805,30 @@ function roundRiver(st){
   const cap1=capWords(st.river[0]);
   typeRound({key:'river',eyebrow:roundTag(),title:`Which <b>river</b> flows through ${st.name}? 🌊`,
     sub:'Start typing — pick a river from the list',placeholder:'River name…',attempts:3,
-    accept:st.river,autocomplete:RIVERS_ALL,pickSubmit:true,
+    accept:st.river,autocomplete:RIVERS_ALL,pickSubmit:false,
     reveal:s=>s?`Right — the <b>${cap1}</b> flows through ${st.name}.`:`A major river of ${st.name} is the <b>${cap1}</b>.`});
 }
 
-/* ---------- ROUND 1: SPOT THE LANDMARK (real images, no names) ---------- */
+/* ---------- ROUND 1: SPOT THE LANDMARK (real photos only, no names) ---------- */
 function roundLmSpot(st){
-  const options=shuffle([{name:st.lm,emoji:st.lmEmoji,ok:true},
-    ...st.lmDecoy.map(d=>({name:d,emoji:lmEmojiFor(d),ok:false}))]);
   const c=stageCard(roundTag(),`Which of these is a landmark of <b>${st.name}</b>?`,'Tap the one that belongs here');
   const grid=el('div','lmgrid');c.appendChild(grid);
   const credit=el('div','lmcredit');c.appendChild(credit);
   c.appendChild(el('div','rcont'));
-  let done=false,allImg=false;
-  const cells=options.map(o=>{const t=el('button','lmtile loading');
-    t.innerHTML=`<span class="lmemoji dim">${o.emoji}</span><span class="lmspin"></span>`;
-    t.onclick=()=>{if(!done)reveal(o);};grid.appendChild(t);return t;});
-
+  let done=false,allImg=false,options=[];
+  const cells=[0,1,2,3].map(()=>{const t=el('button','lmtile loading');t.innerHTML='<span class="lmspin"></span>';grid.appendChild(t);return t;});
   function paint(){
     options.forEach((o,i)=>{const t=cells[i];t.classList.remove('loading');
-      const showCap=!allImg;                       // names only in the no-image fallback
+      const showCap=!allImg;
       t.classList.toggle('imgmode',allImg);
       t.innerHTML=(o.url?`<img src="${o.url}" alt="" loading="lazy" onerror="this.closest('.lmtile').classList.add('noimg');this.remove()">`:'')
         +`<span class="lmemoji${o.url?' hide':''}">${o.emoji}</span>`
-        +`<span class="lmcap"${showCap?'':' style="display:none"'}>${o.name}</span>`;});
+        +`<span class="lmcap"${showCap?'':' style="display:none"'}>${o.name}</span>`;
+      t.onclick=()=>{if(!done)reveal(o);};});
   }
   function reveal(chosen){
     done=true;credit.style.display='none';
-    options.forEach((o,i)=>{const t=cells[i];t.disabled=true;t.classList.remove('imgmode');
+    options.forEach((o,i)=>{const t=cells[i];if(!t)return;t.disabled=true;t.classList.remove('imgmode');
       if(o.ok)t.classList.add('ok');else if(o===chosen)t.classList.add('bad');});
     const success=!!chosen&&chosen.ok;
     concludeRound(c,'lmspot',success,
@@ -835,10 +836,27 @@ function roundLmSpot(st){
              :`Not that one — the photo glowing green is the landmark of ${st.name}.`);
   }
   addSkip(c,()=>{if(!done)reveal(null);});
-
-  Promise.all(options.map(o=>LMIMG[o.name]?Promise.resolve(LMIMG[o.name]):wikiThumb(wikiTitle(o.name))))
-    .then(urls=>{options.forEach((o,i)=>o.url=urls[i]);allImg=urls.every(u=>!!u);paint();
-      if(allImg)credit.innerHTML='<span></span><span class="cr">photos via Wikipedia</span>';});
+  const fetchImg=n=>LMIMG[n]?Promise.resolve(LMIMG[n]):wikiThumb(wikiTitle(n));
+  (async()=>{
+    // pool: thematic decoys first, then other states' landmarks — only ones with a photo are used
+    const seen=new Set([st.lm]);
+    const pool=shuffle([...st.lmDecoy,...STATES.map(s=>s.lm)].filter(n=>{if(seen.has(n))return false;seen.add(n);return true;})).slice(0,8);
+    let urls;
+    try{urls=await Promise.all([fetchImg(st.lm),...pool.map(fetchImg)]);}catch(e){urls=[];}
+    if(done)return;
+    const correctUrl=urls[0];const decoys=[];
+    pool.forEach((n,i)=>{if(decoys.length<3&&urls[i+1])decoys.push({name:n,emoji:lmEmojiFor(n),url:urls[i+1],ok:false});});
+    if(correctUrl&&decoys.length===3){
+      allImg=true;
+      options=shuffle([{name:st.lm,emoji:st.lmEmoji,url:correctUrl,ok:true},...decoys]);
+      credit.innerHTML='<span></span><span class="cr">photos via Wikipedia</span>';
+    }else{
+      allImg=false;   // rare: couldn't get 4 photos — fall back to labelled cards
+      options=shuffle([{name:st.lm,emoji:st.lmEmoji,url:correctUrl,ok:true},
+        ...st.lmDecoy.map(d=>({name:d,emoji:lmEmojiFor(d),ok:false}))]);
+    }
+    paint();
+  })();
 }
 
 /* ---------- ROUND 2: NAME THE LANDMARK (image + 4 name options) ---------- */
@@ -900,7 +918,7 @@ function boxRound(opts){
 function roundLangs(st){
   typeRound({key:'langs',eyebrow:roundTag(),title:`Name the <b>2 main languages</b> of ${st.name} 🗣️`,
     sub:'Type two languages — pick from the list (any order)',placeholder:'A language…',multi:2,sets:st.langs,
-    autocomplete:LANGS_ALL,pickSubmit:true,
+    autocomplete:LANGS_ALL,pickSubmit:false,
     reveal:s=>{const a=st.langs.map(set=>set[0][0].toUpperCase()+set[0].slice(1)).join(' & ');
       return (s?'Nicely done! ':'The main languages are ')+`<b>${a}</b>.`;}});
 }
@@ -956,6 +974,7 @@ $('#giveupBtn').onclick=()=>{
   for(let i=G.idx;i<G.rounds.length;i++){if(!G.badges[G.rounds[i].key])G.badges[G.rounds[i].key]='missed';}
   G.gaveUp=true;G.idx=G.rounds.length;persist();showSummary();
 };
+$('#prevBtn').onclick=goPrevRound;
 $('#segDaily').onclick=()=>{if(G.mode!=='daily'){$('#giveupBar').style.display='';startDaily();}};
 $('#segPractice').onclick=()=>{$('#giveupBar').style.display='';startPractice();};
 
