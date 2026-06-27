@@ -641,8 +641,9 @@ function submitShape(raw){
   const name=resolveState(raw);if(!name){toast('Not a valid state or UT');return;}
   if(G.shapeGuesses.includes(name)){toast('Already guessed');return;}
   G.shapeGuesses.push(name);const correct=name===G.target.name;
+  if(correct)G.shapeSolved=true;
   renderGuessRows();const inp=$('#guess');if(inp)inp.value='';closeAC();persist();
-  if(correct){G.shapeSolved=true;lockShape(true);}
+  if(correct){lockShape(true);}
   else if(G.shapeGuesses.length>=MAX_GUESSES)lockShape(false);
 }
 function lockShape(justWon){
@@ -1042,7 +1043,7 @@ $('#segPractice').onclick=()=>{$('#giveupBar').style.display='';startPractice();
 startDaily();
 </script>
 <!-- Cloudflare Web Analytics — paste the token from Cloudflare dashboard → Web Analytics → Add a site (manual setup, since the domain is DNS-only at GoDaddy). Replace the placeholder below with your real token. -->
-<script>(function(){var CF_TOKEN="8c10ddb2db8c4ce6b8feca2e5564695a";
+<script>(function(){var CF_TOKEN="YOUR_CLOUDFLARE_TOKEN";
   if(CF_TOKEN&&CF_TOKEN!=="YOUR_CLOUDFLARE_TOKEN"){
     var s=document.createElement('script');s.defer=true;
     s.src='https://static.cloudflareinsights.com/beacon.min.js';
