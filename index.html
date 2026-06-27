@@ -454,7 +454,8 @@ function concludeRound(card,key,success,html){
   const sb=card.querySelector('.skipbar');if(sb)sb.remove();
   let cont=card.querySelector('.rcont');if(!cont){cont=el('div','rcont');card.appendChild(cont);}
   cont.innerHTML='';feedbackEl(cont,success,html);
-  nextBtn(cont,'Next round →',()=>finishRound(key,success));
+  const last=G.idx>=G.rounds.length-1;
+  nextBtn(cont,last?'See results →':'Next round →',()=>finishRound(key,success));
 }
 function addSkip(card,onSkip){
   const bar=el('div','skipbar');
