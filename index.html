@@ -238,6 +238,21 @@ header{text-align:center;padding-top:2px}
 .shareline{font-family:var(--mono);font-size:15px;letter-spacing:2px;background:var(--panel);border:1px solid var(--line);
   border-radius:10px;padding:11px;word-break:break-word;line-height:1.5}
 .sharebtns{display:flex;gap:8px;flex-wrap:wrap;justify-content:center}
+.rlhead{font-family:var(--ui);font-weight:700;font-size:13px;color:var(--ink);text-align:left;margin:6px 2px 0;
+  text-transform:uppercase;letter-spacing:.04em}
+.rlist{display:flex;flex-direction:column;gap:5px;text-align:left}
+.rlrow{display:grid;grid-template-columns:22px 1fr auto;align-items:center;gap:8px 10px;
+  background:var(--panel);border:1px solid var(--line);border-radius:10px;padding:8px 11px}
+.rlrow.no{border-color:rgba(242,97,122,.45);background:linear-gradient(180deg,rgba(242,97,122,.07),transparent)}
+.rlrow.ok{opacity:.78}
+.rle{font-size:16px;text-align:center}
+.rln{font-weight:600;font-size:13px}
+.rlmark{font-weight:800;font-size:14px}
+.rlrow.ok .rlmark{color:var(--green)} .rlrow.no .rlmark{color:var(--red)}
+.rla{grid-column:2/4;font-size:12.5px;display:flex;flex-wrap:wrap;gap:4px 8px;align-items:baseline;margin-top:-2px}
+.rlrow.ok .rla{color:var(--muted)}
+.rlc{color:var(--green);font-weight:600}
+.rly{color:var(--red)}
 .wa{background:#25D366;color:#062b14}
 
 footer{text-align:center;color:var(--muted2);font-size:11px;line-height:1.7;margin-top:2px}
@@ -450,13 +465,34 @@ const cap=s=>s?s[0].toUpperCase()+s.slice(1):s;
 const capWords=s=>s.split(' ').map(cap).join(' ');
 
 /* shared: conclude a round (feedback + Next), and a per-round skip/reveal */
-function concludeRound(card,key,success,html){
+function concludeRound(card,key,success,html,your){
+  if(!G.results)G.results={};
+  G.results[key]={success:success,your:(your==null||your==='')?null:String(your),correct:correctAnswerFor(key)};
   const sb=card.querySelector('.skipbar');if(sb)sb.remove();
   let cont=card.querySelector('.rcont');if(!cont){cont=el('div','rcont');card.appendChild(cont);}
   cont.innerHTML='';feedbackEl(cont,success,html);
   const last=G.idx>=G.rounds.length-1;
   nextBtn(cont,last?'See results →':'Next round →',()=>finishRound(key,success));
 }
+function areaLabel(a){const L=[0,2000,5000,10000,20000,35000,55000,80000,120000,160000,220000,350000];
+  let bi=0;for(let i=0;i<L.length-1;i++){if(a>=L[i]&&a<L[i+1]){bi=i;break;}}if(a>=L[L.length-1])bi=L.length-2;
+  return L[bi].toLocaleString('en-IN')+' – '+L[bi+1].toLocaleString('en-IN')+' km²';}
+function correctAnswerFor(key){const st=G.target;switch(key){
+  case 'shape': return st.name;
+  case 'capital': return st.capital;
+  case 'cappin': return st.capital+' (capital)';
+  case 'locate': return st.name;
+  case 'nbrcount': return st.neighbours.length+' '+(st.neighbours.length===1?'state/UT':'states/UTs');
+  case 'nbrname': return st.neighbours.join(', ')||'none';
+  case 'river': return st.river?capWords(st.river[0]):'—';
+  case 'lmspot': return st.lm;
+  case 'lmid': return st.lm;
+  case 'lmpin': return st.lm+' (landmark)';
+  case 'langs': return st.langs.map(g=>cap(g[0])).join(' & ');
+  case 'bigdist': return DISTRICTS[st.name]?DISTRICTS[st.name].big:'—';
+  case 'area': return areaLabel(st.area);
+  default: return '';
+}}
 function addSkip(card,onSkip){
   const bar=el('div','skipbar');
   const b=el('button','btn ghost sm full','See answer & skip to next round →');
@@ -613,6 +649,9 @@ function lockShape(justWon){
   const inp=$('#guess'),btn=$('#guessBtn');if(inp)inp.disabled=true;if(btn)btn.disabled=true;closeAC();
   const cont=$('#shapeCont');if(!cont)return;cont.innerHTML='';
   const won=G.shapeSolved;
+  if(!G.results)G.results={};
+  G.results.shape={success:won,correct:G.target.name,
+    your:won?null:(G.shapeGuesses.filter(g=>g!==G.target.name).join(', ')||null)};
   cont.appendChild(feedbackEl(cont,won,won?`Nice — it's <b>${G.target.name}</b>. Now let's see what you know about it.`:`Out of tries — it was <b>${G.target.name}</b>. Carry on with the bonus rounds!`));
   nextBtn(cont,'Start bonus rounds →',()=>finishRound('shape',won));
 }
@@ -630,7 +669,7 @@ function typeRound(opts){
   const att=el('div','attempts');c.appendChild(att);
   c.appendChild(el('div','rcont'));
   const inp=entry.querySelector('#tin'),tbtn=entry.querySelector('#tbtn');
-  let done=false,attempts=opts.attempts||3,entered=[];const need=opts.multi||0;
+  let done=false,attempts=opts.attempts||3,entered=[],youSaid=[];const need=opts.multi||0;
   function updAtt(){
     if(opts.targets)att.innerHTML=`Found <b>${entered.filter(e=>e.ok).length}/${need}</b>`;
     else if(opts.sets)att.innerHTML=`Entered <b>${entered.length}/${need}</b>`;
@@ -641,9 +680,10 @@ function typeRound(opts){
   function chip(text,ok){chips.appendChild(el('span','chip '+(ok?'ok':'no'),(ok?'✓ ':'✕ ')+text));}
   function conclude(success){done=true;inp.disabled=true;tbtn.disabled=true;if(AC)AC.close();
     if(opts.onConclude)opts.onConclude(success);
-    concludeRound(c,opts.key,success,opts.reveal(success));}
+    concludeRound(c,opts.key,success,opts.reveal(success),youSaid.join(', ')||null);}
   function submit(){
     if(done)return;const val=inp.value.trim();if(!val){toast('Type an answer');return;}
+    youSaid.push(val);
     if(opts.targets){
       const canon=opts.resolver(val);
       const ok=!!canon&&opts.targets.includes(canon)&&!entered.find(e=>e.ok&&e.canon===canon);
@@ -773,7 +813,7 @@ function roundLocate(st){
     concludeRound(c,'locate',success,
       success?`Spot on — that's <b>${st.name}</b>.`
         :(picked?`That was <b>${picked}</b> — <b>${st.name}</b> is the one glowing green.`
-                :`<b>${st.name}</b> is the one glowing green.`));
+                :`<b>${st.name}</b> is the one glowing green.`), picked||null);
   }
   india.querySelectorAll('.istate,.lochit').forEach(p=>{p.onclick=()=>{if(!done)reveal(p.dataset.n);};});
   addSkip(c,()=>{if(!done)reveal(null);});
@@ -834,7 +874,8 @@ function roundLmSpot(st){
     const success=!!chosen&&chosen.ok;
     concludeRound(c,'lmspot',success,
       success?`Correct — that's a landmark of ${st.name}. You'll name it next.`
-             :`Not that one — the photo glowing green is the landmark of ${st.name}.`);
+             :`Not that one — the photo glowing green is the landmark of ${st.name}.`,
+      chosen?chosen.name:null);
   }
   addSkip(c,()=>{if(!done)reveal(null);});
   const fetchImg=n=>LMIMG[n]?Promise.resolve(LMIMG[n]):wikiThumb(wikiTitle(n));
@@ -874,7 +915,8 @@ function roundLmId(st){
     btns.forEach((b,i)=>{const o=options[i];b.disabled=true;if(o.ok)b.classList.add('ok');else if(o===chosen)b.classList.add('bad');});
     const success=!!chosen&&chosen.ok;
     concludeRound(c,'lmid',success,
-      success?`Correct — this is the <b>${st.lm}</b> ${st.lmEmoji}.`:`This is the <b>${st.lm}</b> ${st.lmEmoji}.`);}
+      success?`Correct — this is the <b>${st.lm}</b> ${st.lmEmoji}.`:`This is the <b>${st.lm}</b> ${st.lmEmoji}.`,
+      chosen?chosen.name:null);}
   addSkip(c,()=>{if(!done)grade(null);});
   (LMIMG[st.lm]?Promise.resolve(LMIMG[st.lm]):wikiThumb(wikiTitle(st.lm),640)).then(url=>{
     hero.classList.remove('loading');
@@ -910,7 +952,7 @@ function boxRound(opts){
     btns.forEach((b,i)=>{const o=opts.options[i];b.disabled=true;b.classList.remove('sel');
       if(o.ok)b.classList.add('ok');else if(chosen.includes(o))b.classList.add('bad');});
     if(sub2btn)sub2btn.style.display='none';
-    concludeRound(c,opts.key,success,opts.reveal(success));
+    concludeRound(c,opts.key,success,opts.reveal(success), chosen.length?chosen.map(o=>opts.big(o)).join(', '):null);
   }
   addSkip(c,()=>{if(!done)grade([]);});
 }
@@ -943,17 +985,33 @@ function roundArea(st){
 function showSummary(){
   renderBadges();$('#giveupBar').style.display='none';
   const st=G.target;const earned=G.rounds.filter(r=>G.badges[r.key]==='earned').length;
-  const total=G.rounds.length;
+  const total=G.rounds.length;const missedN=total-earned;
   const s=el('div','summary');
   s.appendChild(el('h2',null,`<span class="state">${st.name}</span>`));
   s.appendChild(el('div','rsub',st.type==='UT'?'Union Territory':'State'));
   s.appendChild(el('div','scorebig',`${earned}<span>/${total} badges</span>`));
-  const grid=el('div','bgrid');
-  G.rounds.forEach(r=>{const got=G.badges[r.key]==='earned';
-    const cell=el('div','bcell'+(got?' earned':(G.badges[r.key]==='missed'?' missed':'')));
-    cell.innerHTML=`<span class="e">${got?r.emoji:'🔒'}</span><span class="n">${r.name}</span>`;grid.appendChild(cell);});
-  s.appendChild(grid);
   s.appendChild(el('div','shareline',shareGrid()));
+  // round-by-round breakdown — clear about what was missed and the right answer
+  s.appendChild(el('div','rlhead',missedN?`What you missed (${missedN})`:'Round by round'));
+  const list=el('div','rlist');
+  G.rounds.forEach(r=>{
+    const got=G.badges[r.key]==='earned';
+    const res=(G.results&&G.results[r.key])||{};
+    const correct=res.correct||correctAnswerFor(r.key);
+    const row=el('div','rlrow '+(got?'ok':'no'));
+    let ans='';
+    if(got){ans=`<span class="rla"><b>${correct}</b></span>`;}
+    else{
+      ans=`<span class="rla"><span class="rlc">${correct}</span>`+
+          (res.your?` <span class="rly">you said: ${res.your}</span>`:` <span class="rly">skipped</span>`)+
+          `</span>`;
+    }
+    row.innerHTML=`<span class="rle">${r.emoji}</span>`+
+      `<span class="rln">${r.name}</span>`+
+      `<span class="rlmark">${got?'✓':'✗'}</span>`+ans;
+    list.appendChild(row);
+  });
+  s.appendChild(list);
   const sb=el('div','sharebtns');
   const wa=el('button','btn wa sm','Share on WhatsApp');wa.onclick=()=>window.open('https://wa.me/?text='+encodeURIComponent(shareText()),'_blank');
   const cp=el('button','btn peacock sm','Copy result');cp.onclick=()=>{const t=shareText();if(navigator.share){navigator.share({text:t}).catch(()=>{});}else navigator.clipboard?.writeText(t).then(()=>toast('Copied!'),()=>toast('Copy failed'));};
