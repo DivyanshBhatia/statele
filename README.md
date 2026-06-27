@@ -87,3 +87,20 @@ where the two differ.
 - Boundaries are simplified for fast loading and are meant for a game, not for any
   official or legal use.
 - Not affiliated with Worldle or Teuteuf Games — an independent homage.
+
+## Analytics (Cloudflare Web Analytics)
+
+The page includes a gated Cloudflare Web Analytics beacon near the end of `index.html`.
+It does nothing until you add your token:
+
+1. In the Cloudflare dashboard go to **Web Analytics → Add a site**, enter `statele.in`,
+   and choose **manual setup** (the domain is DNS-only at GoDaddy, not proxied through
+   Cloudflare, so automatic injection isn't available).
+2. Copy the **site token** Cloudflare shows you.
+3. In `index.html`, find `var CF_TOKEN="YOUR_CLOUDFLARE_TOKEN";` and replace the
+   placeholder with your token. Commit and push.
+
+Once live, the Cloudflare dashboard reports visitors, page views, referrers, countries,
+browsers, devices and Core Web Vitals — all cookieless and privacy-first (no consent
+banner needed). Note: Cloudflare Web Analytics tracks page-level metrics only; it does
+not support custom in-game events.
